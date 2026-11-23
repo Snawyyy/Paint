@@ -588,7 +588,7 @@ function pixLine(c,x0,y0,x1,y1,col,s=1){
 function hex2rgb(h){h=h.replace('#','');return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]}
 function flood(x,y,col){
   const img=ctx.getImageData(0,0,W,H),d=new Uint32Array(img.data.buffer);
-  const [r,g,b]=hex2rgb(col);const nc=(255<<24)|(b<<16)|(g<<8)|r;const tc=d[y*W+x];if(tc===nc)return;
+  const [r,g,b]=hex2rgb(col);const nc=((255<<24)|(b<<16)|(g<<8)|r)>>>0;const tc=d[y*W+x];if(tc===nc)return;
   const st=[[x,y]];
   while(st.length){let [cx,cy]=st.pop();let i=cy*W+cx;while(cx>=0&&d[i]===tc){cx--;i--}cx++;i++;let up=false,dn=false;
     while(cx<W&&d[i]===tc){d[i]=nc;
