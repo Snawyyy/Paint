@@ -47,6 +47,9 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
 #stage canvas{position:absolute;left:0;top:0;image-rendering:pixelated;touch-action:none}
 #cv{background:#fff}
 .hd{position:absolute;width:5px;height:5px;background:#000080;pointer-events:none}
+.hd.live{pointer-events:auto;touch-action:none;z-index:5}
+.hd.live::before{content:'';position:absolute;inset:-12px}
+#rz{position:absolute;left:0;top:0;border:1px dashed #000;pointer-events:none;display:none;z-index:4}
 #bottom{padding:3px 2px 2px}
 #palrow{display:flex;gap:4px;align-items:flex-start}
 #cur{width:30px;height:30px;position:relative;background:repeating-conic-gradient(#fff 0 25%,#c0c0c0 0 50%) 0 0/2px 2px;flex:none}
@@ -553,8 +556,22 @@ function applyZoom(){
   stage.style.width=W*zoom+'px';stage.style.height=H*zoom+'px';
   stage.querySelectorAll('.hd').forEach(h=>h.remove());
   const pts=[[0,0],[.5,0],[1,0],[0,.5],[1,.5],[0,1],[.5,1],[1,1]];
-  pts.forEach(([a,b])=>{const h=document.createElement('div');h.className='hd';h.style.left=(W*zoom*a-2)+'px';h.style.top=(H*zoom*b-2)+'px';stage.appendChild(h)});
+  pts.forEach(([a,b])=>{const h=document.createElement('div');h.className='hd';h.style.left=(W*zoom*a-2)+'px';h.style.top=(H*zoom*b-2)+'px';
+    if((a===1&&b>0)||(b===1&&a>0)){h.classList.add('live');h.style.cursor=a===1&&b===1?'nwse-resize':a===1?'ew-resize':'ns-resize';edgeDrag(h,a===1,b===1)}
+    stage.appendChild(h)});
   pan(0,0);
+}
+/* drag the right, bottom or corner handle to resize the canvas, like MS Paint */
+function edgeDrag(h,dx,dy){
+  let st=null;
+  h.onpointerdown=e=>{e.preventDefault();e.stopPropagation();closeMenus();commitSel();h.setPointerCapture(e.pointerId);st={x:e.clientX,y:e.clientY,w:W,h:H,nw:W,nh:H}};
+  h.onpointermove=e=>{if(!st)return;
+    st.nw=dx?Math.max(1,Math.min(4000,Math.round(st.w+(e.clientX-st.x)/zoom))):W;
+    st.nh=dy?Math.max(1,Math.min(4000,Math.round(st.h+(e.clientY-st.y)/zoom))):H;
+    let r=$('#rz');if(!r){r=document.createElement('div');r.id='rz';stage.appendChild(r)}
+    r.style.display='block';r.style.width=st.nw*zoom+'px';r.style.height=st.nh*zoom+'px';posEl.textContent=st.nw+'x'+st.nh};
+  const up=()=>{if(!st)return;const {nw,nh}=st;st=null;const r=$('#rz');if(r)r.remove();resizeTo(nw,nh)};
+  h.onpointerup=up;h.onpointercancel=up;
 }
 let px=0,py=0;
 function pan(dx,dy){
