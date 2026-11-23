@@ -28,6 +28,10 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
 .drop hr{border:0;border-top:1px solid #808080;border-bottom:1px solid #fff;margin:3px 2px}
 #main{flex:1;display:flex;min-height:0}
 #side{width:32px;flex:none;padding:0 2px;display:flex;flex-direction:column;align-items:flex-start}
+#hist{display:grid;grid-template-columns:26px;border:1px solid;border-color:#808080 #fff #fff #808080}
+#hist .tool:active{border-color:#404040 #fff #fff #404040}
+#hist .tool.off svg{opacity:.35}
+#sep{width:26px;height:0;margin:4px 0;border-top:1px solid #808080;border-bottom:1px solid #fff}
 #tools{display:grid;grid-template-columns:26px;gap:0;border:1px solid;border-color:#808080 #fff #fff #808080}
 .tool{width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:2px solid;border-color:#fff #404040 #404040 #fff;background:#c0c0c0}
 .tool svg{width:16px;height:16px;shape-rendering:crispEdges}
@@ -92,6 +96,7 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
   </div>
   <div id="main">
     <div id="side">
+      <div id="hist"></div><div id="sep"></div>
       <div id="tools"></div>
       <div id="opts" class="sunken"></div>
     </div>
@@ -389,6 +394,40 @@ ell:[
 '................',
 '................',
 '................'],
+undo:[
+'................',
+'................',
+'................',
+'....k...........',
+'...kk...........',
+'..kkkkkkkkk.....',
+'.kkkkkkkkkkk....',
+'..kkkkkkkkkkk...',
+'...kk......kk...',
+'....k......kk...',
+'...........kk...',
+'...........kk...',
+'..........kk....',
+'................',
+'................',
+'................'],
+redo:[
+'................',
+'................',
+'................',
+'...........k....',
+'...........kk...',
+'.....kkkkkkkkk..',
+'....kkkkkkkkkkk.',
+'...kkkkkkkkkkk..',
+'...kk......kk...',
+'...kk......k....',
+'...kk...........',
+'...kk...........',
+'....kk..........',
+'................',
+'................',
+'................'],
 rrect:[
 '................',
 '................',
@@ -424,6 +463,15 @@ TOOLS.forEach(([id,help])=>{
   b.onpointerdown=e=>{e.preventDefault();setTool(id);msg(help)};
   toolsEl.appendChild(b);
 });
+
+/* ---------- undo / redo buttons ---------- */
+[['undo','Undo: takes back the last change.'],['redo','Repeat: puts back what Undo took away.']].forEach(([id,help])=>{
+  const b=document.createElement('div');b.className='tool';b.id='b_'+id;
+  b.innerHTML='<svg viewBox="0 0 16 16">'+I[id]+'</svg>';
+  b.onpointerdown=e=>{e.preventDefault();closeMenus();(id==='undo'?doUndo:doRedo)();msg(help)};
+  $('#hist').appendChild(b);
+});
+function histState(){$('#b_undo').classList.toggle('off',!undo.length);$('#b_redo').classList.toggle('off',!redo.length)}
 
 /* ---------- palette ---------- */
 const PAL=['#000000','#808080','#800000','#808000','#008000','#008080','#000080','#800080','#808040','#004040','#0080ff','#004080','#4000ff','#804000',
@@ -509,12 +557,12 @@ function offerRestore(){
   let d=null;try{d=JSON.parse(localStorage.getItem(AS))}catch(e){}
   if(!d||!d.img)return;
   const rec=$('#rec');$('#recImg').src=d.img;rec.style.display='flex';
-  $('#recLoad').onclick=()=>{rec.style.display='none';const img=new Image();img.onload=()=>{save();ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.drawImage(img,0,0);undo.length=0;dirty=true;msg('Last picture loaded.')};img.src=d.img};
+  $('#recLoad').onclick=()=>{rec.style.display='none';const img=new Image();img.onload=()=>{save();ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.drawImage(img,0,0);undo.length=0;dirty=true;histState();msg('Last picture loaded.')};img.src=d.img};
   $('#recNew').onclick=()=>{rec.style.display='none';clearAutosave()};
 }
-function save(){dirty=true;undo.push(ctx.getImageData(0,0,W,H));if(undo.length>40)undo.shift();redo.length=0}
-function doUndo(){commitSel(true);cancelShape();if(!undo.length)return;redo.push(ctx.getImageData(0,0,W,H));ctx.putImageData(undo.pop(),0,0)}
-function doRedo(){if(!redo.length)return;undo.push(ctx.getImageData(0,0,W,H));ctx.putImageData(redo.pop(),0,0)}
+function save(){dirty=true;undo.push(ctx.getImageData(0,0,W,H));if(undo.length>40)undo.shift();redo.length=0;histState()}
+function doUndo(){commitSel(true);cancelShape();if(!undo.length)return;redo.push(ctx.getImageData(0,0,W,H));ctx.putImageData(undo.pop(),0,0);dirty=true;histState()}
+function doRedo(){if(!redo.length)return;undo.push(ctx.getImageData(0,0,W,H));ctx.putImageData(redo.pop(),0,0);dirty=true;histState()}
 
 /* ---------- helpers ---------- */
 const msgEl=$('#msg'),posEl=$('#pos');
@@ -759,7 +807,7 @@ $('#saveName').onkeydown=e=>{if(e.key==='Enter')$('#saveOk').onclick();else if(e
 document.addEventListener('touchmove',e=>{if(!e.target.closest('#txt,.dlg'))e.preventDefault()},{passive:false});
 document.addEventListener('gesturestart',e=>e.preventDefault());
 window.addEventListener('resize',()=>{if(undo.length||W)return;fit()});
-setTool('pencil');
+setTool('pencil');histState();
 requestAnimationFrame(()=>{fit();offerRestore()});
 })();
 </script>
