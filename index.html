@@ -763,6 +763,6 @@ setTool('pencil');
 requestAnimationFrame(()=>{fit();offerRestore()});
 })();
 </script>
-<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js')</script>
+<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js',{updateViaCache:'none'})</script>
 </body>
 </html>
