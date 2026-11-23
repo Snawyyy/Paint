@@ -58,19 +58,21 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
 #txt button,.btn{font:inherit;font-size:16px;background:#c0c0c0;padding:6px 12px;border:2px solid;border-color:#fff #404040 #404040 #fff}
 #colorIn{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
 #fileIn{display:none}
-#rec{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.4);z-index:50}
-#rec .win{background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;box-shadow:1px 1px 0 #000;width:min(320px,90vw)}
-#rec .ttl{background:#000080;color:#fff;font-weight:bold;padding:3px 6px;font-size:13px}
-#rec .bd{padding:10px;display:flex;flex-direction:column;gap:8px;align-items:center;font-size:13px}
+/* dialogs */
+.dlg{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.4);z-index:50}
+.dlg .win{background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;box-shadow:1px 1px 0 #000;width:min(320px,90vw)}
+.dlg .ttl{background:#000080;color:#fff;font-weight:bold;padding:3px 6px;font-size:13px}
+.dlg .bd{padding:10px;display:flex;flex-direction:column;gap:8px;align-items:center;font-size:13px}
 #rec img{max-width:100%;max-height:40vh;background:#fff;image-rendering:pixelated}
-#rec .row{display:flex;gap:10px}
+.dlg .row{display:flex;gap:10px}
+#saveName{width:100%;font-size:16px;padding:5px;border:2px solid;border-color:#808080 #fff #fff #808080;user-select:text;-webkit-user-select:text}
 </style>
 </head>
 <body>
 <div id="app">
   <div id="menubar">
     <div class="menu"><span><u>F</u>ile</span><div class="drop">
-      <div data-a="new">New</div><div data-a="open">Open...</div><div data-a="save">Save as PNG</div>
+      <div data-a="new">New</div><div data-a="open">Open...</div><div data-a="save">Save As...</div>
     </div></div>
     <div class="menu"><span><u>E</u>dit</span><div class="drop">
       <div data-a="undo">Undo</div><div data-a="redo">Repeat</div><hr>
@@ -105,10 +107,15 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
   </div>
 </div>
 <div id="txt"><input id="txtIn" placeholder="Type text"><button id="txtOk">OK</button><button id="txtNo">X</button></div>
-<div id="rec"><div class="win"><div class="ttl">Paint</div><div class="bd">
+<div id="rec" class="dlg"><div class="win"><div class="ttl">Paint</div><div class="bd">
   <div>Your last picture was not saved. Load it?</div>
   <div class="sunken"><img id="recImg" alt="Last picture"></div>
   <div class="row"><button class="btn" id="recLoad">Load</button><button class="btn" id="recNew">New</button></div>
+</div></div></div>
+<div id="saveDlg" class="dlg"><div class="win"><div class="ttl">Save As</div><div class="bd">
+  <div style="align-self:flex-start">File name:</div>
+  <input id="saveName" autocomplete="off" spellcheck="false">
+  <div class="row"><button class="btn" id="saveOk">Save</button><button class="btn" id="saveNo">Cancel</button></div>
 </div></div></div>
 <input type="color" id="colorIn"><input type="file" id="fileIn" accept="image/*">
 <script>
@@ -713,7 +720,7 @@ const A={
  new(){commitSel();save();ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H)},
  clear(){commitSel();save();ctx.fillStyle=bg;ctx.fillRect(0,0,W,H)},
  open(){$('#fileIn').click()},
- save(){commitSel();const up=document.createElement('canvas');up.width=W*4;up.height=H*4;const ug=up.getContext('2d');ug.imageSmoothingEnabled=false;ug.drawImage(cv,0,0,W*4,H*4);up.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='untitled.png';a.click();clearAutosave();setTimeout(()=>URL.revokeObjectURL(a.href),2000)},'image/png')},
+ save(){commitSel();const d=$('#saveDlg'),n=$('#saveName');n.value=fileName;d.style.display='flex';n.focus();n.select()},
  undo:doUndo,redo:doRedo,
  selall(){commitSel();setTool('rsel');sel={x:0,y:0,w:W,h:H,floating:false};drawSel()},
  delsel(){if(!sel)return;lift();sel=null;clearOv()},
@@ -730,8 +737,17 @@ $('#colorIn').oninput=e=>{fg=e.target.value;showColors()};
 $('#fileIn').onchange=e=>{const f=e.target.files[0];if(!f)return;const img=new Image();img.onload=()=>{commitSel();save();ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
   const s=Math.min(W/img.width,H/img.height,1);ctx.imageSmoothingEnabled=false;ctx.drawImage(img,0,0,img.width*s,img.height*s);URL.revokeObjectURL(img.src)};img.src=URL.createObjectURL(f);e.target.value=''};
 
+/* ---------- save as ---------- */
+let fileName='untitled';
+function writePng(name){const up=document.createElement('canvas');up.width=W*4;up.height=H*4;const ug=up.getContext('2d');ug.imageSmoothingEnabled=false;ug.drawImage(cv,0,0,W*4,H*4);
+  up.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name+'.png';a.click();clearAutosave();msg('Saved '+name+'.png');setTimeout(()=>URL.revokeObjectURL(a.href),2000)},'image/png')}
+function closeSave(){$('#saveDlg').style.display='none';$('#saveName').blur()}
+$('#saveOk').onclick=()=>{const v=$('#saveName').value.trim().replace(/\.png$/i,'').replace(/[\\/:*?"<>|]/g,'_');if(!v)return;fileName=v;closeSave();writePng(v)};
+$('#saveNo').onclick=closeSave;
+$('#saveName').onkeydown=e=>{if(e.key==='Enter')$('#saveOk').onclick();else if(e.key==='Escape')closeSave()};
+
 /* ---------- init ---------- */
-document.addEventListener('touchmove',e=>{if(!e.target.closest('#txt'))e.preventDefault()},{passive:false});
+document.addEventListener('touchmove',e=>{if(!e.target.closest('#txt,#saveDlg'))e.preventDefault()},{passive:false});
 document.addEventListener('gesturestart',e=>e.preventDefault());
 window.addEventListener('resize',()=>{if(undo.length||W)return;fit()});
 setTool('pencil');
