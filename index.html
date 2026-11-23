@@ -70,7 +70,7 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
 #rec img{max-width:100%;max-height:40vh;background:#fff;image-rendering:pixelated}
 .dlg .row{display:flex;gap:10px}
 #saveName{width:100%}
-#saveName,#bordNum{font-size:16px;padding:5px;border:2px solid;border-color:#808080 #fff #fff #808080;user-select:text;-webkit-user-select:text}
+#saveName,#bordNum,#sizeW,#sizeH{font-size:16px;padding:5px;border:2px solid;border-color:#808080 #fff #fff #808080;user-select:text;-webkit-user-select:text}
 </style>
 </head>
 <body>
@@ -88,7 +88,7 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
     </div></div>
     <div class="menu"><span><u>I</u>mage</span><div class="drop">
       <div data-a="fliph">Flip Horizontal</div><div data-a="flipv">Flip Vertical</div><div data-a="rot">Rotate 180</div><hr>
-      <div data-a="replace">Replace Color...</div><div data-a="invert">Invert Colors</div><div data-a="clear">Clear Image</div>
+      <div data-a="size">Canvas Size...</div><div data-a="replace">Replace Color...</div><div data-a="invert">Invert Colors</div><div data-a="clear">Clear Image</div>
     </div></div>
     <div class="menu"><span>E<u>x</u>tras</span><div class="drop">
       <div data-a="editfg">Edit Colors...</div><div data-a="swap">Swap Colors</div><hr>
@@ -125,6 +125,12 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
   <label style="align-self:flex-start;display:flex;align-items:center;gap:6px"><input type="checkbox" id="bordOn"> Add border</label>
   <div id="bordRow" style="align-self:stretch;display:none;align-items:center;gap:6px">Margin <input id="bordNum" type="number" min="0" max="200" inputmode="numeric" style="width:80px"> px, with a 2 px black frame</div>
   <div class="row"><button class="btn" id="saveOk">Save</button><button class="btn" id="saveNo">Cancel</button></div>
+</div></div></div>
+<div id="sizeDlg" class="dlg"><div class="win"><div class="ttl">Canvas Size</div><div class="bd">
+  <div class="row" style="align-items:center">Width <input id="sizeW" type="number" min="1" max="4000" inputmode="numeric" style="width:80px"></div>
+  <div class="row" style="align-items:center">Height <input id="sizeH" type="number" min="1" max="4000" inputmode="numeric" style="width:80px"></div>
+  <div style="font-size:11px">Pixels. The picture stays in the top left corner.</div>
+  <div class="row"><button class="btn" id="sizeOk">OK</button><button class="btn" id="sizeFit">Fit Screen</button><button class="btn" id="sizeNo">Cancel</button></div>
 </div></div></div>
 <input type="color" id="colorIn"><input type="file" id="fileIn" accept="image/*">
 <script>
@@ -526,6 +532,15 @@ function setTool(id){
 }
 
 /* ---------- sizing ---------- */
+/* change canvas size; keeps the top-left of the picture and fills new space with white */
+function setSize(w,h,img){
+  const keep=W?ctx.getImageData(0,0,W,H):null;W=w;H=h;cv.width=ov.width=W;cv.height=ov.height=H;
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+  if(img)ctx.putImageData(img,0,0);else if(keep)ctx.putImageData(keep,0,0);
+  applyZoom();
+}
+/* put a snapshot back, resizing first if it was taken at another size */
+function putSnap(im){if(im.width!==W||im.height!==H)setSize(im.width,im.height,im);else ctx.putImageData(im,0,0)}
 function fit(){
   const r=work.getBoundingClientRect();
   W=Math.max(50,Math.floor(r.width-12));H=Math.max(50,Math.floor(r.height-12));
@@ -569,12 +584,12 @@ function offerRestore(){
   let d=null;try{d=JSON.parse(localStorage.getItem(AS))}catch(e){}
   if(!d||!d.img)return;
   const rec=$('#rec');$('#recImg').src=d.img;rec.style.display='flex';
-  $('#recLoad').onclick=()=>{rec.style.display='none';const img=new Image();img.onload=()=>{save();ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.drawImage(img,0,0);undo.length=0;dirty=true;histState();msg('Last picture loaded.')};img.src=d.img};
+  $('#recLoad').onclick=()=>{rec.style.display='none';const img=new Image();img.onload=()=>{if(d.w&&d.h)setSize(d.w,d.h);ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.drawImage(img,0,0);undo.length=0;dirty=true;histState();msg('Last picture loaded.')};img.src=d.img};
   $('#recNew').onclick=()=>{rec.style.display='none';clearAutosave()};
 }
 function save(){dirty=true;undo.push(ctx.getImageData(0,0,W,H));if(undo.length>40)undo.shift();redo.length=0;histState()}
-function doUndo(){commitSel(true);cancelShape();if(!undo.length)return;redo.push(ctx.getImageData(0,0,W,H));ctx.putImageData(undo.pop(),0,0);dirty=true;histState()}
-function doRedo(){if(!redo.length)return;undo.push(ctx.getImageData(0,0,W,H));ctx.putImageData(redo.pop(),0,0);dirty=true;histState()}
+function doUndo(){commitSel(true);cancelShape();if(!undo.length)return;redo.push(ctx.getImageData(0,0,W,H));putSnap(undo.pop());dirty=true;histState()}
+function doRedo(){if(!redo.length)return;undo.push(ctx.getImageData(0,0,W,H));putSnap(redo.pop());dirty=true;histState()}
 
 /* ---------- helpers ---------- */
 const msgEl=$('#msg'),posEl=$('#pos');
@@ -797,6 +812,7 @@ const A={
  fliph(){transform(()=>{ctx.translate(W,0);ctx.scale(-1,1)})},
  flipv(){transform(()=>{ctx.translate(0,H);ctx.scale(1,-1)})},
  rot(){transform(()=>{ctx.translate(W,H);ctx.scale(-1,-1)})},
+ size(){commitSel();$('#sizeW').value=W;$('#sizeH').value=H;$('#sizeDlg').style.display='flex';$('#sizeW').focus();$('#sizeW').select()},
  replace(){commitSel();setTool('repl');msg('Tap a color on the picture to change it to the current color.')},
  invert(){commitSel();save();const im=ctx.getImageData(0,0,W,H),d=im.data;for(let i=0;i<d.length;i+=4){d[i]=255-d[i];d[i+1]=255-d[i+1];d[i+2]=255-d[i+2]}ctx.putImageData(im,0,0)},
  editfg(){const ci=$('#colorIn');ci.value=fg;ci.click()},
@@ -822,6 +838,14 @@ $('#saveOk').onclick=()=>{const v=$('#saveName').value.trim().replace(/\.png$/i,
 $('#saveNo').onclick=closeSave;
 $('#bordNum').onkeydown=e=>{if(e.key==='Enter')$('#saveOk').onclick()};
 $('#saveName').onkeydown=e=>{if(e.key==='Enter')$('#saveOk').onclick();else if(e.key==='Escape')closeSave()};
+
+/* ---------- canvas size ---------- */
+function closeSize(){$('#sizeDlg').style.display='none';document.activeElement.blur()}
+function resizeTo(w,h){w=Math.max(1,Math.min(4000,w|0));h=Math.max(1,Math.min(4000,h|0));if(w===W&&h===H)return;cancelShape();save();setSize(w,h);msg('Canvas is now '+w+' x '+h+'.')}
+$('#sizeOk').onclick=()=>{const w=parseInt($('#sizeW').value,10),h=parseInt($('#sizeH').value,10);closeSize();if(w>0&&h>0)resizeTo(w,h)};
+$('#sizeFit').onclick=()=>{const r=work.getBoundingClientRect();closeSize();resizeTo(Math.floor(r.width-12),Math.floor(r.height-12))};
+$('#sizeNo').onclick=closeSize;
+['#sizeW','#sizeH'].forEach(id=>$(id).onkeydown=e=>{if(e.key==='Enter')$('#sizeOk').onclick();else if(e.key==='Escape')closeSize()});
 
 /* ---------- init ---------- */
 document.addEventListener('touchmove',e=>{if(!e.target.closest('#txt,.dlg'))e.preventDefault()},{passive:false});
