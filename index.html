@@ -23,6 +23,7 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
 .menu.open>span{border:1px solid;border-color:#808080 #fff #fff #808080;padding:1px 5px}
 .drop{display:none;position:absolute;left:0;top:100%;min-width:140px;background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;box-shadow:1px 1px 0 #000;padding:2px}
 .menu.open .drop{display:block}
+.drop{max-height:75vh;overflow-y:auto}
 .drop div{padding:6px 14px;font-size:13px;white-space:nowrap}
 .drop div:active,.drop div.hl{background:#000080;color:#fff}
 .drop hr{border:0;border-top:1px solid #808080;border-bottom:1px solid #fff;margin:3px 2px}
@@ -72,8 +73,14 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
 .dlg .bd{padding:10px;display:flex;flex-direction:column;gap:8px;align-items:center;font-size:13px}
 #rec img{max-width:100%;max-height:40vh;background:#fff;image-rendering:pixelated}
 .dlg .row{display:flex;gap:10px}
-#saveName{width:100%}
-#saveName,#bordNum,#sizeW,#sizeH{font-size:16px;padding:5px;border:2px solid;border-color:#808080 #fff #fff #808080;user-select:text;-webkit-user-select:text}
+#saveName,#peName{width:100%}
+#peGrid{display:grid;grid-template-columns:repeat(8,30px);gap:3px;padding:4px;min-height:40px;background:#fff}
+#peGrid .pc{width:30px;height:30px;border:2px solid;border-color:#808080 #fff #fff #808080}
+#peGrid .pc.on{outline:2px dashed #000;outline-offset:1px}
+#peBtns{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+#peBtns .btn{font-size:14px;padding:5px 8px}
+.btn:disabled{color:#808080;text-shadow:1px 1px #fff}
+#saveName,#bordNum,#sizeW,#sizeH,#peName{font-size:16px;padding:5px;border:2px solid;border-color:#808080 #fff #fff #808080;user-select:text;-webkit-user-select:text}
 </style>
 </head>
 <body>
@@ -95,7 +102,8 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
     </div></div>
     <div class="menu"><span>E<u>x</u>tras</span><div class="drop">
       <div data-a="editfg">Edit Colors...</div><div data-a="swap">Swap Colors</div><hr>
-      <div data-a="pal0">Palette: Classic</div><div data-a="pal1">Palette: NA16</div><div data-a="pal2">Palette: Parchment and Ink</div><div data-a="pal3">Palette: DawnBringer 16</div>
+      <div id="palList"></div><hr>
+      <div data-a="palNew">New Palette...</div><div data-a="palEdit" id="palEditItem">Edit This Palette...</div>
     </div></div>
   </div>
   <div id="main">
@@ -135,6 +143,17 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
   <div style="font-size:11px">Pixels. The picture stays in the top left corner.</div>
   <div class="row"><button class="btn" id="sizeOk">OK</button><button class="btn" id="sizeFit">Fit Screen</button><button class="btn" id="sizeNo">Cancel</button></div>
 </div></div></div>
+<div id="palDlg" class="dlg"><div class="win"><div class="ttl" id="peTtl">New Palette</div><div class="bd">
+  <input id="peName" placeholder="Palette name" autocomplete="off" spellcheck="false">
+  <div class="sunken"><div id="peGrid"></div></div>
+  <div id="peHint" style="font-size:11px">Tap a color to pick it, then Change or Remove it.</div>
+  <div id="peBtns">
+    <button class="btn" id="peAdd">Add Color</button><button class="btn" id="peAddFg">Add Current</button>
+    <button class="btn" id="peChg">Change</button><button class="btn" id="peDel">Remove</button>
+  </div>
+  <div class="row"><button class="btn" id="peSave">Save</button><button class="btn" id="peTrash">Delete</button><button class="btn" id="peNo">Cancel</button></div>
+</div></div></div>
+<input type="color" id="peColor" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px">
 <input type="color" id="colorIn"><input type="file" id="fileIn" accept="image/*">
 <script>
 (()=>{
@@ -484,16 +503,23 @@ TOOLS.forEach(([id,help])=>{
 function histState(){$('#b_undo').classList.toggle('off',!undo.length);$('#b_redo').classList.toggle('off',!redo.length)}
 
 /* ---------- palette ---------- */
-const PALS=[
+const PRESETS=[
 ['#000000','#808080','#800000','#808000','#008000','#008080','#000080','#800080','#808040','#004040','#0080ff','#004080','#4000ff','#804000',
 '#ffffff','#c0c0c0','#ff0000','#ffff00','#00ff00','#00ffff','#0000ff','#ff00ff','#ffff80','#00ff80','#80ffff','#8080ff','#ff0080','#ff8040'],
 '8c8fae 584563 3e2137 9a6348 d79b7d f5edba c0c741 647d34 e4943a 9d303b d26471 70377f 7ec4c1 34859d 17434b 1f0e1c',
 'f1e2be e6d1a1 f0d696 caac77 a58a62 886243 c0977a 944431 d2bc76 ad9d62 887c56 594a45 a9a994 87867a 445162 000000',
 '140c1c 442434 30346d 4e4a4e 854c30 346524 d04648 757161 597dce d27d2c 8595a1 6daa2c d2aa99 6dc2ca dad45e deeed6'
 ].map(p=>typeof p==='string'?p.split(' ').map(h=>'#'+h):p);
+const PNAMES=['Classic','NA16','Parchment and Ink','DawnBringer 16'],BUILT=PRESETS.length;
+/* the user's own palettes live after the presets, saved on the device */
+let custom=[];try{custom=JSON.parse(localStorage.getItem('paint-pals'))||[]}catch(e){}
+const allPals=()=>PRESETS.map((c,i)=>({name:PNAMES[i],colors:c})).concat(custom);
+function storePals(){try{localStorage.setItem('paint-pals',JSON.stringify(custom))}catch(e){}}
+let cur=0;
 const palEl=$('#pal');
 function setPal(n){
-  palEl.innerHTML='';const P=PALS[n];palEl.style.gridTemplateColumns=`repeat(${Math.ceil(P.length/2)},15px)`;
+  const all=allPals();n=Math.max(0,Math.min(all.length-1,n|0));cur=n;
+  palEl.innerHTML='';const P=all[n].colors;palEl.style.gridTemplateColumns=`repeat(${Math.max(1,Math.ceil(P.length/2))},15px)`;
   P.forEach(c=>{
     const s=document.createElement('div');s.className='sw';s.style.background=c;
     let t=null,long=false;
@@ -502,10 +528,49 @@ function setPal(n){
     s.onpointerleave=()=>clearTimeout(t);
     palEl.appendChild(s);
   });
-  document.querySelectorAll('[data-a^="pal"]').forEach(d=>d.style.fontWeight=d.dataset.a==='pal'+n?'bold':'');
+  renderPalMenu();
   try{localStorage.setItem('paint-pal',n)}catch(e){}
 }
-setPal(+(localStorage.getItem('paint-pal')||0)%PALS.length);
+function renderPalMenu(){
+  const L=$('#palList');L.innerHTML='';
+  allPals().forEach((p,i)=>{const d=document.createElement('div');d.textContent='Palette: '+p.name+(i>=BUILT?' *':'');
+    if(i===cur)d.style.fontWeight='bold';d.onclick=e=>{e.stopPropagation();closeMenus();setPal(i)};L.appendChild(d)});
+  $('#palEditItem').style.display=cur>=BUILT?'':'none';
+}
+
+/* ---------- palette editor ---------- */
+let pe=null; // {idx (-1 = new), colors, on}
+function openPalEd(idx){
+  const src=idx<0?allPals()[cur]:custom[idx];
+  pe={idx,colors:src.colors.slice(0,28),on:-1};
+  $('#peTtl').textContent=idx<0?'New Palette':'Edit Palette';
+  $('#peName').value=idx<0?'My Palette '+(custom.length+1):src.name;
+  $('#peTrash').style.display=idx<0?'none':'';
+  drawPe();$('#palDlg').style.display='flex';
+}
+function drawPe(){
+  const g=$('#peGrid');g.innerHTML='';
+  pe.colors.forEach((c,i)=>{const d=document.createElement('div');d.className='pc'+(i===pe.on?' on':'');d.style.background=c;
+    d.onclick=()=>{pe.on=pe.on===i?-1:i;drawPe()};g.appendChild(d)});
+  const full=pe.colors.length>=28,none=pe.on<0;
+  $('#peAdd').disabled=$('#peAddFg').disabled=full;$('#peChg').disabled=$('#peDel').disabled=none;
+  $('#peHint').textContent=pe.colors.length+' of 28 colors. '+(none?'Tap a color to pick it.':'Change or Remove the picked color.');
+}
+let peMode='add';
+$('#peAdd').onclick=()=>{peMode='add';const c=$('#peColor');c.value=fg;c.click()};
+$('#peChg').onclick=()=>{if(pe.on<0)return;peMode='chg';const c=$('#peColor');c.value=pe.colors[pe.on];c.click()};
+$('#peColor').onchange=e=>{const v=e.target.value;if(peMode==='chg'&&pe.on>=0)pe.colors[pe.on]=v;else if(pe.colors.length<28){pe.colors.push(v);pe.on=pe.colors.length-1}drawPe()};
+$('#peAddFg').onclick=()=>{if(pe.colors.length<28){pe.colors.push(fg);pe.on=pe.colors.length-1;drawPe()}};
+$('#peDel').onclick=()=>{if(pe.on<0)return;pe.colors.splice(pe.on,1);pe.on=-1;drawPe()};
+function closePe(){$('#palDlg').style.display='none';document.activeElement.blur();pe=null}
+$('#peNo').onclick=closePe;
+$('#peSave').onclick=()=>{if(!pe.colors.length){$('#peHint').textContent='Add at least one color.';return}
+  const name=$('#peName').value.trim()||'My Palette';const p={name,colors:pe.colors};let n;
+  if(pe.idx<0){custom.push(p);n=BUILT+custom.length-1}else{custom[pe.idx]=p;n=BUILT+pe.idx}
+  storePals();closePe();setPal(n);msg('Palette "'+name+'" saved.')};
+$('#peTrash').onclick=()=>{if(pe.idx<0)return;const name=custom[pe.idx].name;if(!confirm('Delete palette "'+name+'"?'))return;
+  custom.splice(pe.idx,1);storePals();closePe();setPal(0);msg('Palette deleted.')};
+setPal(+(localStorage.getItem('paint-pal')||0));
 function showColors(){$('#fg').style.background=fg;$('#bg').style.background=bg}
 showColors();
 $('#cur').onpointerdown=e=>{e.preventDefault();[fg,bg]=[bg,fg];showColors()};
@@ -851,7 +916,7 @@ const A={
  replace(){commitSel();setTool('repl');msg('Tap a color on the picture to change it to the current color.')},
  invert(){commitSel();save();const im=ctx.getImageData(0,0,W,H),d=im.data;for(let i=0;i<d.length;i+=4){d[i]=255-d[i];d[i+1]=255-d[i+1];d[i+2]=255-d[i+2]}ctx.putImageData(im,0,0)},
  editfg(){const ci=$('#colorIn');ci.value=fg;ci.click()},
- pal0(){setPal(0)},pal1(){setPal(1)},pal2(){setPal(2)},pal3(){setPal(3)},
+ palNew(){openPalEd(-1)},palEdit(){if(cur>=BUILT)openPalEd(cur-BUILT)},
  swap(){[fg,bg]=[bg,fg];showColors()}
 };
 document.querySelectorAll('.drop div[data-a]').forEach(d=>d.onclick=e=>{e.stopPropagation();closeMenus();A[d.dataset.a]()});
