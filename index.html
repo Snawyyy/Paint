@@ -91,7 +91,8 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
       <div data-a="replace">Replace Color...</div><div data-a="invert">Invert Colors</div><div data-a="clear">Clear Image</div>
     </div></div>
     <div class="menu"><span>E<u>x</u>tras</span><div class="drop">
-      <div data-a="editfg">Edit Colors...</div><div data-a="swap">Swap Colors</div>
+      <div data-a="editfg">Edit Colors...</div><div data-a="swap">Swap Colors</div><hr>
+      <div data-a="pal0">Palette: Classic</div><div data-a="pal1">Palette: NA16</div><div data-a="pal2">Palette: Parchment and Ink</div><div data-a="pal3">Palette: DawnBringer 16</div>
     </div></div>
   </div>
   <div id="main">
@@ -474,17 +475,28 @@ TOOLS.forEach(([id,help])=>{
 function histState(){$('#b_undo').classList.toggle('off',!undo.length);$('#b_redo').classList.toggle('off',!redo.length)}
 
 /* ---------- palette ---------- */
-const PAL=['#000000','#808080','#800000','#808000','#008000','#008080','#000080','#800080','#808040','#004040','#0080ff','#004080','#4000ff','#804000',
-'#ffffff','#c0c0c0','#ff0000','#ffff00','#00ff00','#00ffff','#0000ff','#ff00ff','#ffff80','#00ff80','#80ffff','#8080ff','#ff0080','#ff8040'];
+const PALS=[
+['#000000','#808080','#800000','#808000','#008000','#008080','#000080','#800080','#808040','#004040','#0080ff','#004080','#4000ff','#804000',
+'#ffffff','#c0c0c0','#ff0000','#ffff00','#00ff00','#00ffff','#0000ff','#ff00ff','#ffff80','#00ff80','#80ffff','#8080ff','#ff0080','#ff8040'],
+'8c8fae 584563 3e2137 9a6348 d79b7d f5edba c0c741 647d34 e4943a 9d303b d26471 70377f 7ec4c1 34859d 17434b 1f0e1c',
+'f1e2be e6d1a1 f0d696 caac77 a58a62 886243 c0977a 944431 d2bc76 ad9d62 887c56 594a45 a9a994 87867a 445162 000000',
+'140c1c 442434 30346d 4e4a4e 854c30 346524 d04648 757161 597dce d27d2c 8595a1 6daa2c d2aa99 6dc2ca dad45e deeed6'
+].map(p=>typeof p==='string'?p.split(' ').map(h=>'#'+h):p);
 const palEl=$('#pal');
-PAL.forEach(c=>{
-  const s=document.createElement('div');s.className='sw';s.style.background=c;
-  let t=null,long=false;
-  s.onpointerdown=e=>{e.preventDefault();long=false;t=setTimeout(()=>{long=true;bg=c;showColors();msg('Background color set (long press).')},450)};
-  s.onpointerup=()=>{clearTimeout(t);if(!long){fg=c;showColors()}};
-  s.onpointerleave=()=>clearTimeout(t);
-  palEl.appendChild(s);
-});
+function setPal(n){
+  palEl.innerHTML='';const P=PALS[n];palEl.style.gridTemplateColumns=`repeat(${Math.ceil(P.length/2)},15px)`;
+  P.forEach(c=>{
+    const s=document.createElement('div');s.className='sw';s.style.background=c;
+    let t=null,long=false;
+    s.onpointerdown=e=>{e.preventDefault();long=false;t=setTimeout(()=>{long=true;bg=c;showColors();msg('Background color set (long press).')},450)};
+    s.onpointerup=()=>{clearTimeout(t);if(!long){fg=c;showColors()}};
+    s.onpointerleave=()=>clearTimeout(t);
+    palEl.appendChild(s);
+  });
+  document.querySelectorAll('[data-a^="pal"]').forEach(d=>d.style.fontWeight=d.dataset.a==='pal'+n?'bold':'');
+  try{localStorage.setItem('paint-pal',n)}catch(e){}
+}
+setPal(+(localStorage.getItem('paint-pal')||0)%PALS.length);
 function showColors(){$('#fg').style.background=fg;$('#bg').style.background=bg}
 showColors();
 $('#cur').onpointerdown=e=>{e.preventDefault();[fg,bg]=[bg,fg];showColors()};
@@ -788,6 +800,7 @@ const A={
  replace(){commitSel();setTool('repl');msg('Tap a color on the picture to change it to the current color.')},
  invert(){commitSel();save();const im=ctx.getImageData(0,0,W,H),d=im.data;for(let i=0;i<d.length;i+=4){d[i]=255-d[i];d[i+1]=255-d[i+1];d[i+2]=255-d[i+2]}ctx.putImageData(im,0,0)},
  editfg(){const ci=$('#colorIn');ci.value=fg;ci.click()},
+ pal0(){setPal(0)},pal1(){setPal(1)},pal2(){setPal(2)},pal3(){setPal(3)},
  swap(){[fg,bg]=[bg,fg];showColors()}
 };
 document.querySelectorAll('.drop div[data-a]').forEach(d=>d.onclick=e=>{e.stopPropagation();closeMenus();A[d.dataset.a]()});
