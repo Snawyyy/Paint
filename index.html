@@ -65,7 +65,7 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
 .dlg .bd{padding:10px;display:flex;flex-direction:column;gap:8px;align-items:center;font-size:13px}
 #rec img{max-width:100%;max-height:40vh;background:#fff;image-rendering:pixelated}
 .dlg .row{display:flex;gap:10px}
-#saveName{width:100%;font-size:16px;padding:5px;border:2px solid;border-color:#808080 #fff #fff #808080;user-select:text;-webkit-user-select:text}
+#saveName,#bordNum{width:100%;font-size:16px;padding:5px;border:2px solid;border-color:#808080 #fff #fff #808080;user-select:text;-webkit-user-select:text}
 </style>
 </head>
 <body>
@@ -83,7 +83,7 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
     </div></div>
     <div class="menu"><span><u>I</u>mage</span><div class="drop">
       <div data-a="fliph">Flip Horizontal</div><div data-a="flipv">Flip Vertical</div><div data-a="rot">Rotate 180</div><hr>
-      <div data-a="invert">Invert Colors</div><div data-a="clear">Clear Image</div>
+      <div data-a="border">Add Border...</div><div data-a="invert">Invert Colors</div><div data-a="clear">Clear Image</div>
     </div></div>
     <div class="menu"><span>E<u>x</u>tras</span><div class="drop">
       <div data-a="editfg">Edit Colors...</div><div data-a="swap">Swap Colors</div>
@@ -116,6 +116,11 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
   <div style="align-self:flex-start">File name:</div>
   <input id="saveName" autocomplete="off" spellcheck="false">
   <div class="row"><button class="btn" id="saveOk">Save</button><button class="btn" id="saveNo">Cancel</button></div>
+</div></div></div>
+<div id="bordDlg" class="dlg"><div class="win"><div class="ttl">Add Border</div><div class="bd">
+  <div style="align-self:flex-start">Margin (pixels) around the drawing. A 2 px black border is drawn around it.</div>
+  <input id="bordNum" type="number" min="0" max="200" inputmode="numeric">
+  <div class="row"><button class="btn" id="bordOk">OK</button><button class="btn" id="bordNo">Cancel</button></div>
 </div></div></div>
 <input type="color" id="colorIn"><input type="file" id="fileIn" accept="image/*">
 <script>
@@ -728,6 +733,7 @@ const A={
  fliph(){transform(()=>{ctx.translate(W,0);ctx.scale(-1,1)})},
  flipv(){transform(()=>{ctx.translate(0,H);ctx.scale(1,-1)})},
  rot(){transform(()=>{ctx.translate(W,H);ctx.scale(-1,-1)})},
+ border(){commitSel();const d=$('#bordDlg'),n=$('#bordNum');n.value=bordMargin;d.style.display='flex';n.focus();n.select()},
  invert(){commitSel();save();const im=ctx.getImageData(0,0,W,H),d=im.data;for(let i=0;i<d.length;i+=4){d[i]=255-d[i];d[i+1]=255-d[i+1];d[i+2]=255-d[i+2]}ctx.putImageData(im,0,0)},
  editfg(){const ci=$('#colorIn');ci.value=fg;ci.click()},
  swap(){[fg,bg]=[bg,fg];showColors()}
@@ -746,8 +752,20 @@ $('#saveOk').onclick=()=>{const v=$('#saveName').value.trim().replace(/\.png$/i,
 $('#saveNo').onclick=closeSave;
 $('#saveName').onkeydown=e=>{if(e.key==='Enter')$('#saveOk').onclick();else if(e.key==='Escape')closeSave()};
 
+/* ---------- border ---------- */
+let bordMargin=10;
+/* shrink the drawing to fit inside the margin, frame it with 2 px black, fill the margin with white */
+function addBorder(m){const B=2,ins=m+B,iw=W-ins*2,ih=H-ins*2;if(iw<4||ih<4){msg('Margin too big.');return}
+  save();const c=document.createElement('canvas');c.width=W;c.height=H;c.getContext('2d').drawImage(cv,0,0);
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.fillStyle='#000';ctx.fillRect(m,m,W-m*2,H-m*2);
+  ctx.imageSmoothingEnabled=false;ctx.drawImage(c,ins,ins,iw,ih);msg('Border added.')}
+function closeBord(){$('#bordDlg').style.display='none';$('#bordNum').blur()}
+$('#bordOk').onclick=()=>{const v=Math.max(0,Math.min(200,parseInt($('#bordNum').value,10)||0));bordMargin=v;closeBord();addBorder(v)};
+$('#bordNo').onclick=closeBord;
+$('#bordNum').onkeydown=e=>{if(e.key==='Enter')$('#bordOk').onclick();else if(e.key==='Escape')closeBord()};
+
 /* ---------- init ---------- */
-document.addEventListener('touchmove',e=>{if(!e.target.closest('#txt,#saveDlg'))e.preventDefault()},{passive:false});
+document.addEventListener('touchmove',e=>{if(!e.target.closest('#txt,.dlg'))e.preventDefault()},{passive:false});
 document.addEventListener('gesturestart',e=>e.preventDefault());
 window.addEventListener('resize',()=>{if(undo.length||W)return;fit()});
 setTool('pencil');
