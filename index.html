@@ -88,7 +88,7 @@ body{font-family:Tahoma,"MS Sans Serif",Arial,sans-serif;font-size:12px;color:#0
     </div></div>
     <div class="menu"><span><u>I</u>mage</span><div class="drop">
       <div data-a="fliph">Flip Horizontal</div><div data-a="flipv">Flip Vertical</div><div data-a="rot">Rotate 180</div><hr>
-      <div data-a="invert">Invert Colors</div><div data-a="clear">Clear Image</div>
+      <div data-a="replace">Replace Color...</div><div data-a="invert">Invert Colors</div><div data-a="clear">Clear Image</div>
     </div></div>
     <div class="menu"><span>E<u>x</u>tras</span><div class="drop">
       <div data-a="editfg">Edit Colors...</div><div data-a="swap">Swap Colors</div>
@@ -507,7 +507,7 @@ function renderOpts(){
 }
 function setTool(id){
   if(S.tool!==id){commitSel();cancelShape()}
-  if(id==='pick'&&S.tool!=='pick')S.prevTool=S.tool;
+  if((id==='pick'||id==='repl')&&S.tool!=='pick'&&S.tool!=='repl')S.prevTool=S.tool;
   S.tool=id;
   document.querySelectorAll('.tool').forEach(b=>b.classList.toggle('on',b.dataset.t===id));
   renderOpts();
@@ -585,6 +585,11 @@ function flood(x,y,col){
       cx++;i++}}
   ctx.putImageData(img,0,0);
 }
+/* swap every pixel of one exact color for another, across the whole canvas */
+function replaceColor(from,to){if(from===to){msg('That is already the current color.');return}
+  const im=ctx.getImageData(0,0,W,H),d=im.data,[a,b,c]=hex2rgb(from),[x,y,z]=hex2rgb(to);let n=0;
+  for(let i=0;i<d.length;i+=4)if(d[i]===a&&d[i+1]===b&&d[i+2]===c){d[i]=x;d[i+1]=y;d[i+2]=z;n++}
+  ctx.putImageData(im,0,0);msg('Replaced '+n+' pixels.')}
 function getPix(x,y){const d=ctx.getImageData(x,y,1,1).data;return'#'+[d[0],d[1],d[2]].map(v=>v.toString(16).padStart(2,'0')).join('')}
 function rrPath(c,x,y,w,h,r){r=Math.min(r,Math.abs(w)/2,Math.abs(h)/2);c.beginPath();c.roundRect?c.roundRect(x,y,w,h,r):c.rect(x,y,w,h)}
 /* hard-edged rendering: draw to a temp canvas, then snap every pixel to fg/bg with full or zero alpha */
@@ -679,6 +684,7 @@ ov.addEventListener('pointerdown',e=>{
   else if(t==='brush'){save();stampLine(ctx,p.x,p.y,p.x,p.y,fg,S.size.brush)}
   else if(t==='eraser'){save();pixLine(ctx,p.x,p.y,p.x,p.y,bg,S.size.eraser)}
   else if(t==='fill'){save();flood(p.x,p.y,fg);drag=null}
+  else if(t==='repl'){save();replaceColor(getPix(p.x,p.y),fg);setTool(S.prevTool);drag=null}
   else if(t==='pick'){fg=getPix(p.x,p.y);showColors();setTool(S.prevTool);drag=null}
   else if(t==='air'){save();spray();airT=setInterval(spray,30)}
   else if(t==='text'){drag=null;askText(p)}
@@ -699,7 +705,7 @@ ov.addEventListener('pointerdown',e=>{
     else{commitSel();drag.path=[p]}
   }
   else if(t==='mag'){}
-  move(e);
+  if(drag)move(e);
 });
 ov.addEventListener('pointermove',e=>{
   const p=pt(e);posEl.textContent=(p.x>=0&&p.y>=0&&p.x<W&&p.y<H)?p.x+','+p.y:'';
@@ -779,6 +785,7 @@ const A={
  fliph(){transform(()=>{ctx.translate(W,0);ctx.scale(-1,1)})},
  flipv(){transform(()=>{ctx.translate(0,H);ctx.scale(1,-1)})},
  rot(){transform(()=>{ctx.translate(W,H);ctx.scale(-1,-1)})},
+ replace(){commitSel();setTool('repl');msg('Tap a color on the picture to change it to the current color.')},
  invert(){commitSel();save();const im=ctx.getImageData(0,0,W,H),d=im.data;for(let i=0;i<d.length;i+=4){d[i]=255-d[i];d[i+1]=255-d[i+1];d[i+2]=255-d[i+2]}ctx.putImageData(im,0,0)},
  editfg(){const ci=$('#colorIn');ci.value=fg;ci.click()},
  swap(){[fg,bg]=[bg,fg];showColors()}
