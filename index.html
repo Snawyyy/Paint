@@ -698,15 +698,17 @@ function drawSel(){
   octx.restore();
 }
 setInterval(()=>{if(sel&&!drag){marchOff=(marchOff+1)%8;drawSel()}},120);
+/* cut the selection out with a hard 0/255 mask so edges never blend or leave half pixels */
 function lift(){
   if(sel.floating)return;save();
-  const c=document.createElement('canvas');c.width=sel.w;c.height=sel.h;const g=c.getContext('2d');
-  if(sel.path){g.beginPath();sel.path.forEach((p,i)=>i?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y));g.closePath();g.clip()}
-  g.drawImage(cv,-sel.x,-sel.y);
-  ctx.save();ctx.fillStyle=bg;
-  if(sel.path){ctx.beginPath();sel.path.forEach((p,i)=>i?ctx.lineTo(sel.x+p.x,sel.y+p.y):ctx.moveTo(sel.x+p.x,sel.y+p.y));ctx.closePath();ctx.fill()}
-  else ctx.fillRect(sel.x,sel.y,sel.w,sel.h);
-  ctx.restore();sel.img=c;sel.floating=true;
+  const {x,y,w,h}=sel,src=ctx.getImageData(x,y,w,h),c=document.createElement('canvas');c.width=w;c.height=h;
+  const cut=new ImageData(w,h),cd=cut.data,sd=src.data,[br,bgc,bb]=hex2rgb(bg);
+  let mask=null;
+  if(sel.path){const m=document.createElement('canvas');m.width=w;m.height=h;const mg=m.getContext('2d');mg.fillStyle='#000';mg.beginPath();
+    sel.path.forEach((p,i)=>i?mg.lineTo(p.x+.5,p.y+.5):mg.moveTo(p.x+.5,p.y+.5));mg.closePath();mg.fill();mask=mg.getImageData(0,0,w,h).data}
+  for(let i=0;i<sd.length;i+=4){if(mask&&mask[i+3]<128)continue;
+    cd[i]=sd[i];cd[i+1]=sd[i+1];cd[i+2]=sd[i+2];cd[i+3]=255;sd[i]=br;sd[i+1]=bgc;sd[i+2]=bb;sd[i+3]=255}
+  ctx.putImageData(src,x,y);c.getContext('2d').putImageData(cut,0,0);sel.img=c;sel.floating=true;
 }
 function commitSel(discard){
   if(!sel)return;if(sel.floating&&!discard)ctx.drawImage(sel.img,sel.x,sel.y);sel=null;clearOv();
@@ -854,8 +856,16 @@ const A={
 };
 document.querySelectorAll('.drop div[data-a]').forEach(d=>d.onclick=e=>{e.stopPropagation();closeMenus();A[d.dataset.a]()});
 $('#colorIn').oninput=e=>{fg=e.target.value;showColors()};
-$('#fileIn').onchange=e=>{const f=e.target.files[0];if(!f)return;const img=new Image();img.onload=()=>{commitSel();save();ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
-  const s=Math.min(W/img.width,H/img.height,1);ctx.imageSmoothingEnabled=false;ctx.drawImage(img,0,0,img.width*s,img.height*s);URL.revokeObjectURL(img.src)};img.src=URL.createObjectURL(f);e.target.value=''};
+/* open an image at its real size (no scaling, so no lost pixels); a 4x PNG saved by this app comes back at 1x */
+function exportScale(img){const k=4;if(img.width%k||img.height%k)return 1;
+  const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const g=c.getContext('2d');g.drawImage(img,0,0);
+  const d=new Uint32Array(g.getImageData(0,0,img.width,img.height).data.buffer),w=img.width;
+  for(let y=0;y<img.height;y++)for(let x=0;x<w;x++)if(d[y*w+x]!==d[(y-y%k)*w+(x-x%k)])return 1;
+  return k}
+$('#fileIn').onchange=e=>{const f=e.target.files[0];if(!f)return;const img=new Image();img.onload=()=>{commitSel();cancelShape();save();
+  const k=exportScale(img),w=Math.min(4000,img.width/k),h=Math.min(4000,img.height/k);
+  setSize(w,h);ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.imageSmoothingEnabled=false;ctx.drawImage(img,0,0,img.width/k,img.height/k);
+  msg('Opened at '+w+' x '+h+(k>1?' (saved copy brought back to 1x).':'.'));URL.revokeObjectURL(img.src)};img.src=URL.createObjectURL(f);e.target.value=''};
 
 /* ---------- save as ---------- */
 let fileName='untitled',bordMargin=10;
