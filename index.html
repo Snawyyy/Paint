@@ -718,12 +718,23 @@ function cancelShape(){S.shape=null;if(!sel)clearOv()}
 
 /* ---------- pointer ---------- */
 let drag=null,airT=null,lastTap=0;
+/* two-finger pan: a second finger cancels what the first one started and moves the view instead */
+const fingers=new Map();let twoPan=false;
+function startPan(){
+  if(twoPan)return;twoPan=true;clearInterval(airT);
+  if(drag&&S.tool!=='rsel'&&S.tool!=='free'){
+    if(undo.length>drag.u){ctx.putImageData(undo.pop(),0,0);histState()}
+    if(drag.sh)S.shape=null;clearOv();if(sel)drawSel();
+  }
+  drag=null;msg('Two fingers: moving the view.');
+}
 ov.addEventListener('pointerdown',e=>{
   e.preventDefault();closeMenus();
-  if(drag)return; // ignore second finger
-  ov.setPointerCapture(e.pointerId);
+  fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});ov.setPointerCapture(e.pointerId);
+  if(fingers.size>=2){startPan();return}
+  if(twoPan||drag)return;
   const p=pt(e),t=S.tool;
-  drag={id:e.pointerId,start:p,last:p,cx:e.clientX,cy:e.clientY};
+  drag={id:e.pointerId,start:p,last:p,cx:e.clientX,cy:e.clientY,u:undo.length,sh:!S.shape};
   if(t==='pencil'){save();pixLine(ctx,p.x,p.y,p.x,p.y,fg)}
   else if(t==='brush'){save();stampLine(ctx,p.x,p.y,p.x,p.y,fg,S.size.brush)}
   else if(t==='eraser'){save();pixLine(ctx,p.x,p.y,p.x,p.y,bg,S.size.eraser)}
@@ -752,6 +763,9 @@ ov.addEventListener('pointerdown',e=>{
   if(drag)move(e);
 });
 ov.addEventListener('pointermove',e=>{
+  if(fingers.has(e.pointerId)){const f=fingers.get(e.pointerId);
+    if(twoPan){e.preventDefault();pan((f.x-e.clientX)/fingers.size,(f.y-e.clientY)/fingers.size)}
+    f.x=e.clientX;f.y=e.clientY;if(twoPan)return}
   const p=pt(e);posEl.textContent=(p.x>=0&&p.y>=0&&p.x<W&&p.y<H)?p.x+','+p.y:'';
   if(drag&&e.pointerId===drag.id){e.preventDefault();move(e)}
 });
@@ -778,6 +792,8 @@ function move(e){
   drag.last=p;
 }
 function end(e){
+  fingers.delete(e.pointerId);
+  if(twoPan){if(!fingers.size)twoPan=false;return}
   if(!drag||e.pointerId!==drag.id)return;
   const p=pt(e),t=S.tool;
   clearInterval(airT);
